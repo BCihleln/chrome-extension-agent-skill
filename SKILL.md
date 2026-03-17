@@ -42,8 +42,8 @@ If the user provides an existing page (MHTML, HTML, screenshot), **always read i
 
 For table-based admin pages (common in game backends, CMS tools, etc.):
 1. Parse the actual HTML to find column indices — never hardcode indices without verifying
-2. Account for `colspan` and `rowspan` in headers (multi-level headers are common)
-3. Note the real `src` attribute values for images (use `getAttribute('src')`, not `img.src` — the latter auto-resolves relative paths and empty strings to the page URL)
+2. Account for `colspan` and `rowspan` (use template → `detect-column-indices.js`)
+3. Note real `src` attribute values (use `getAttribute('src')`, not `img.src`)
 
 For any page:
 - Note the URL pattern to set `matches` in manifest `content_scripts` correctly
@@ -107,12 +107,7 @@ zip -r extension-name.zip . --exclude "*.DS_Store" --exclude "__MACOSX/*"
 
 Copy to `/mnt/user-data/outputs/` and call `present_files`.
 
-### Installation instructions to include with delivery
-
-> 1. 下載 zip 並解壓縮
-> 2. Chrome 網址列輸入 `chrome://extensions`
-> 3. 右上角開啟「**開發人員模式**」
-> 4. 點擊「**載入未封裝項目**」→ 選擇解壓後的資料夾
+交付時，從 `references/installation-guide.md` 取得安裝說明並附在回覆中。
 
 ---
 
