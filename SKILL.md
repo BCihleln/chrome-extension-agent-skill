@@ -1,6 +1,6 @@
 ---
 name: chrome-extension
-description: Build Chrome browser extensions (Manifest V3) from scratch or extend existing ones. Use this skill whenever the user asks to create a Chrome plugin, browser extension, content script, popup UI, or background service worker — or wants to add new detection/automation features to an existing extension. Covers the full lifecycle: requirements clarification → file architecture → implementation → packaging as a downloadable zip.
+description: Build Chrome browser extensions (Manifest V3) from scratch or extend existing ones. Use this skill whenever the user asks to create a Chrome plugin, browser extension, content script, popup UI, or background service worker — or wants to add new detection/automation features to an existing extension.
 ---
 
 # Chrome Extension Skill
