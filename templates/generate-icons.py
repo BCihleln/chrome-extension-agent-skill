@@ -20,7 +20,10 @@ def make_solid_png(size, rgb):
     iend = chunk(b'IEND', b'')
     return sig + ihdr + idat + iend
 
-os.makedirs('icons', exist_ok=True)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+out_dir = os.path.join(script_dir, '..', 'icons')
+os.makedirs(out_dir, exist_ok=True)
+
 for size in [16, 48, 128]:
     with open(f'icons/icon{size}.png', 'wb') as f:
         f.write(make_solid_png(size, (49, 130, 206)))  # 藍色

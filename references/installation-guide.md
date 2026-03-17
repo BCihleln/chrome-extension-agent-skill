@@ -1,7 +1,5 @@
 # Chrome Extension 安裝教學
 
-交付給使用者時，將以下說明附在回覆中或寫入 README.md。
-
 ## 安裝步驟
 
 1. 下載 zip 並解壓縮

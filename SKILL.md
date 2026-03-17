@@ -11,28 +11,30 @@ Build production-ready Chrome extensions (Manifest V3). This skill covers requir
 
 ## Phase 1 — Requirements Clarification
 
-Before writing any code, surface these decisions. Not all are always needed — skip ones obviously answered by the user's request.
+Before writing any code, you **must clarify requirements with user** by using `ask_user_input` tool. 
 
-### Clarify with the user (ask as grouped choices, not one-by-one)
+Below are the requirements that must clarify. If one is obviously answered by the user's request, feel free to skip. You can extend any question as you want.
 
-**Scope & trigger**
-- Which pages should the extension run on? (specific domains / all pages / manual trigger only)
-- Should it activate automatically on page load, or only when the user clicks?
+1. **Scope** (multi_select)  
+Where should the extension run on? (specific domains / all pages / local files)
 
-**Output / results presentation**
-- How should results be shown? Common options:
+2. **Trigger** (single_select)  
+Should it activate automatically on page load, or only when the user clicks?
+
+3. **Output / results presentation** (single_select)  
+How should results be shown? Common options:  
   - Floating panel injected into the page
   - Popup (the toolbar icon click)
   - Both (panel on page + popup as remote control)
 
-**Detection logic** — for content-scanning extensions specifically
+4. **Detection logic** (single_select) — for content-scanning extensions specifically  
 - What exactly counts as a "problem"? Nail down the precise rule before coding.
 - Are there edge cases the user is aware of? (e.g. empty fields, redirected URLs, non-standard server responses)
 
-**Architecture preference**
-- Separate CSS file vs inline styles in JS? (Separate is cleaner for maintainable projects; inline is fine for small utilities)
+5. **Architecture preference** (single_select)
+- Separate CSS file vs inline styles in JS?
 
-Collect all answers before moving to Phase 2. Present options as clickable choices where possible.
+You must collect all answers via `ask_user_input` tool before moving to Phase 2. **Do not to make assumptions.**
 
 ---
 
@@ -59,10 +61,10 @@ For any page:
 extension-name/
 ├── manifest.json        # Extension config and permissions
 ├── content.js           # Injected into target pages
-├── content.css          # Page-level styles (if separate CSS requested)
-├── popup.html           # Toolbar popup UI
-├── popup.js             # Popup logic
-├── background.js        # Service worker (only if needed)
+├── content.css          # Page-level styles (required)
+├── popup.html           # Toolbar popup UI (Optional, Needed if popup required)
+├── popup.js             # Popup logic (Optional, Needed if popup required)
+├── background.js        # Service worker (Optional, Needed if user required)
 └── icons/
     ├── icon16.png
     ├── icon48.png
@@ -75,9 +77,9 @@ Only include `background.js` if the extension needs persistent state across tabs
 
 ## Phase 4 — Implementation
 
-All reusable code patterns are in `templates/`. **Load only what you need** by copying the relevant file into the implementation. Do not load all templates at once.
+All reusable code patterns are in `templates/`. **Load only what you need** by copying the relevant file into the implementation. **Do not load all templates at once.**
 
-| 需要的功能 | 載入的模板檔案 |
+| Required Function | Templates Path |
 |---|---|
 | `manifest.json` 初始結構 | `templates/manifest.json` |
 | Panel 顯示/隱藏（無 flicker） | `templates/panel-toggle.css` + `templates/panel-toggle.js` |
@@ -100,14 +102,13 @@ All reusable code patterns are in `templates/`. **Load only what you need** by c
 
 Package as a zip for the user to load unpacked:
 
+1. Copy `references/installation-guide.md` to the extension-folder, and rename it as README.md
+2. Run script below
 ```bash
 cd /path/to/extension-folder
 zip -r extension-name.zip . --exclude "*.DS_Store" --exclude "__MACOSX/*"
 ```
-
-Copy to `/mnt/user-data/outputs/` and call `present_files`.
-
-交付時，從 `references/installation-guide.md` 取得安裝說明並附在回覆中。
+3. Copy to `/mnt/user-data/outputs/` and call `present_files`.
 
 ---
 
