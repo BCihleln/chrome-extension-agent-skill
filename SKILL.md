@@ -71,190 +71,28 @@ extension-name/
 
 Only include `background.js` if the extension needs persistent state across tabs or alarm-based scheduling. Most content-scanning extensions don't need it.
 
-### When to use a separate CSS file
-
-Use a separate `content.css` (declared in manifest `content_scripts.css`) when:
-- The injected UI is substantial (floating panels, complex overlays)
-- The user explicitly asked for separated concerns
-- Styles are likely to be tweaked independently from logic
-
-Use inline styles (CSS injected via `<style>` tag in JS) when:
-- The extension is a small utility
-- Portability matters (single-file content scripts are easier to share)
-
 ---
 
-## Phase 4 — Implementation Patterns
+## Phase 4 — Implementation
 
-### manifest.json essentials
+All reusable code patterns are in `templates/`. **Load only what you need** by copying the relevant file into the implementation. Do not load all templates at once.
 
-```json
-{
-  "manifest_version": 3,
-  "name": "Extension Name",
-  "version": "1.0.0",
-  "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["*://*.target-domain.com/*"],
-  "content_scripts": [{
-    "matches": ["*://*.target-domain.com/specific/path/*"],
-    "js": ["content.js"],
-    "css": ["content.css"],
-    "run_at": "document_idle"
-  }],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png" }
-  }
-}
-```
+| 需要的功能 | 載入的模板檔案 |
+|---|---|
+| `manifest.json` 初始結構 | `templates/manifest.json` |
+| Panel 顯示/隱藏（無 flicker） | `templates/panel-toggle.css` + `templates/panel-toggle.js` |
+| Popup → content script 通訊 | `templates/safe-send-message.js` |
+| 圖片失效偵測 | `templates/check-image-broken.js` |
+| 多層表頭欄位索引解析 | `templates/detect-column-indices.js` |
+| 程式化生成 icon PNG | `templates/generate-icons.py` |
 
-### Panel show/hide — avoid the flicker trap
+### Key decisions embedded in templates (summary)
 
-**Never** toggle panels with `display: none ↔ flex/block`. When `display: none` is removed, the browser resets layout for one frame before inline `left/top` from drag positioning can re-apply — causing visible jump/flicker.
-
-**Use visibility + opacity instead:**
-
-```css
-#my-panel {
-  /* normal visible state */
-  transition: opacity 0.15s ease, visibility 0.15s ease;
-}
-#my-panel.panel-hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-```
-
-```javascript
-// Show
-panel.classList.remove('panel-hidden');
-// Hide
-panel.classList.add('panel-hidden');
-// Toggle
-panel.classList.toggle('panel-hidden');
-```
-
-### Popup → content script messaging — handle connection errors
-
-`chrome.tabs.sendMessage` throws `"Could not establish connection. Receiving end does not exist."` when the content script hasn't been injected yet (fresh tab, extension just installed, or navigated-to page that doesn't match `content_scripts.matches`). Always wrap with a fallback:
-
-```javascript
-async function safeSendMessage(tab, action) {
-  try {
-    await chrome.tabs.sendMessage(tab.id, { action });
-  } catch (err) {
-    if (err?.message?.includes('Receiving end does not exist')) {
-      // Inject the content script and retry once
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['content.js'],
-      });
-      await new Promise(r => setTimeout(r, 100)); // wait for listener to mount
-      await chrome.tabs.sendMessage(tab.id, { action });
-    } else {
-      console.warn('[Extension] sendMessage failed:', err?.message);
-    }
-  }
-}
-```
-
-### Image broken detection — the correct approach
-
-The simple `naturalWidth === 0` check is insufficient. Servers often return HTTP 200 with an HTML error page for invalid image paths. Use this three-step approach:
-
-```javascript
-async function checkImageBroken(img) {
-  // 1. Use getAttribute, NOT img.src
-  //    img.src auto-resolves empty string to the current page URL → false negative
-  const rawAttr = img.getAttribute('src');
-  if (!rawAttr || rawAttr.trim() === '') return true;
-  if (rawAttr.startsWith('data:')) return !(img.complete && img.naturalWidth > 0);
-
-  // 2. Fast path: already loaded and decoded
-  if (img.complete && img.naturalWidth > 0) return false;
-
-  // 3. Fetch to verify — check Content-Type, not just status code
-  try {
-    let res = await fetch(img.src, { method: 'HEAD', cache: 'no-store' });
-    // Some servers return 405 for HEAD; fall back to GET with Range
-    if (res.status === 405 || res.status === 501) {
-      res = await fetch(img.src, {
-        method: 'GET',
-        headers: { Range: 'bytes=0-0' },
-        cache: 'no-store',
-      });
-    }
-    if (!res.ok && res.status !== 206) return true;
-    // Server may return 200 + HTML error page — verify it's actually an image
-    const ct = res.headers.get('content-type') ?? '';
-    if (ct && !ct.toLowerCase().split(';')[0].trim().startsWith('image/')) return true;
-    return !(img.complete && img.naturalWidth > 0);
-  } catch {
-    return true; // Network error = broken
-  }
-}
-```
-
-### Multi-level table header parsing
-
-For tables with `colspan`/`rowspan` in headers, never assume column indices. Use a grid-mapping approach:
-
-```javascript
-function detectColumnIndices(table, targetHeaders) {
-  const result = {};
-  const grid = [];
-  const headerRows = Array.from(table.querySelectorAll('thead tr, tr:has(th)')).slice(0, 3);
-
-  headerRows.forEach((tr, rowIdx) => {
-    if (!grid[rowIdx]) grid[rowIdx] = [];
-    let colIdx = 0;
-    Array.from(tr.children).forEach(cell => {
-      while (grid[rowIdx][colIdx]) colIdx++;
-      const colspan = parseInt(cell.getAttribute('colspan') || '1');
-      const rowspan = parseInt(cell.getAttribute('rowspan') || '1');
-      const text = cell.textContent.trim();
-      for (let r = 0; r < rowspan; r++) {
-        if (!grid[rowIdx + r]) grid[rowIdx + r] = [];
-        for (let c = 0; c < colspan; c++) grid[rowIdx + r][colIdx + c] = text;
-      }
-      if (targetHeaders.includes(text)) result[text] = colIdx;
-      colIdx += colspan;
-    });
-  });
-  return result;
-}
-```
-
-Always provide fallback index values (`colIndices['ColumnName'] ?? KNOWN_FALLBACK`) in case the page structure changes.
-
-### Generating icons programmatically
-
-When no icon assets are available, generate minimal valid PNGs with Python:
-
-```python
-import struct, zlib
-
-def make_solid_png(size, rgb):
-    r, g, b = rgb
-    raw = b''
-    for _ in range(size):
-        row = bytes([r, g, b, 255] * size)
-        raw += b'\x00' + row
-    compressed = zlib.compress(raw)
-    def chunk(name, data):
-        crc = zlib.crc32(name + data) & 0xffffffff
-        return struct.pack('>I', len(data)) + name + data + struct.pack('>I', crc)
-    sig = b'\x89PNG\r\n\x1a\n'
-    ihdr = chunk(b'IHDR', struct.pack('>II', size, size) + bytes([8, 6, 0, 0, 0]))
-    idat = chunk(b'IDAT', compressed)
-    iend = chunk(b'IEND', b'')
-    return sig + ihdr + idat + iend
-
-for size in [16, 48, 128]:
-    with open(f'icons/icon{size}.png', 'wb') as f:
-        f.write(make_solid_png(size, (49, 130, 206)))  # blue
-```
+- **Panel toggle**: Use `visibility + opacity` class toggle, never `display: none ↔ block` (causes layout flicker after drag positioning).
+- **sendMessage**: Always use `safeSendMessage` — bare `chrome.tabs.sendMessage` throws when content script isn't injected yet.
+- **Image broken check**: Use `getAttribute('src')` not `img.src`; verify `Content-Type` not just HTTP status.
+- **Column indices**: Always resolve dynamically with fallback values; never hardcode.
+- **Icons**: If no assets provided, run `generate-icons.py` to produce valid placeholder PNGs.
 
 ---
 
@@ -267,7 +105,7 @@ cd /path/to/extension-folder
 zip -r extension-name.zip . --exclude "*.DS_Store" --exclude "__MACOSX/*"
 ```
 
-Then copy to `/mnt/user-data/outputs/` and call `present_files`.
+Copy to `/mnt/user-data/outputs/` and call `present_files`.
 
 ### Installation instructions to include with delivery
 

@@ -1,0 +1,10 @@
+/* Panel show/hide — visibility + opacity (避免 display:none 的 flicker 問題) */
+#my-panel {
+  /* normal visible state */
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+#my-panel.panel-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
