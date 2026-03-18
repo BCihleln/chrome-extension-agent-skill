@@ -5,13 +5,13 @@ description: Build Chrome browser extensions (Manifest V3) from scratch or exten
 
 # Chrome Extension Skill
 
-Build production-ready Chrome extensions (Manifest V3). This skill covers requirements gathering, architecture decisions, implementation, common pitfalls, and final packaging.
+## Build New Chrome Extensions
 
----
+Build production-ready Chrome extensions (Manifest V3). The workflow covers requirements gathering, architecture decisions, implementation, common pitfalls, and final packaging.
 
-## Phase 1 — Requirements Clarification
+### Phase 1 — Requirements Clarification
 
-Before writing any code, you **must clarify requirements with user** by using `ask_user_input` tool. 
+Before writing any code, you **must clarify requirements with user** by calling  `ask_user_input`. 
 
 Below are the requirements that must clarify. If one is obviously answered by the user's request, feel free to skip. You can extend any question as you want.
 
@@ -36,9 +36,7 @@ How should results be shown? Common options:
 
 You must collect all answers via `ask_user_input` tool before moving to Phase 2. **Do not to make assumptions.**
 
----
-
-## Phase 2 — Pre-implementation: Read the Source
+### Phase 2 — Pre-implementation: Read the Source
 
 If the user provides an existing page (MHTML, HTML, screenshot), **always read it before writing any code**.
 
@@ -51,11 +49,9 @@ For any page:
 - Note the URL pattern to set `matches` in manifest `content_scripts` correctly
 - Identify the DOM selectors that will be needed
 
----
+### Phase 3 — Architecture
 
-## Phase 3 — Architecture
-
-### Standard file layout (Manifest V3)
+#### Standard file layout (Manifest V3)
 
 ```
 extension-name/
@@ -74,7 +70,7 @@ extension-name/
 
 Only include `background.js` if the extension needs persistent state across tabs or alarm-based scheduling. Most content-scanning extensions don't need it.
 
-### Shared utilities — utils.js
+#### Shared utilities — utils.js
 
 **content.js and popup.js run in completely separate JS environments** — popup cannot call functions defined in content.js, and vice versa. If any function is needed by 2 or more modules, extract it into `utils.js`.
 
@@ -85,9 +81,7 @@ When adding `utils.js`:
 - In `popup.html`, load it **before** popup.js: `<script src="utils.js"></script>`
 - Expose shared functions on a named namespace object (e.g. `const MyExtUtils = { fn1, fn2 }`) to avoid global collisions
 
----
-
-## Phase 4 — Implementation
+### Phase 4 — Implementation
 
 All reusable code patterns are in `templates/`. **Load only what you need** by copying the relevant file into the implementation. **Do not load all templates at once.**
 
@@ -98,10 +92,10 @@ All reusable code patterns are in `templates/`. **Load only what you need** by c
 | Popup → content script 通訊 | `templates/safe-send-message.js` |
 | 圖片失效偵測 | `templates/check-image-broken.js` |
 | 多層表頭欄位索引解析 | `templates/detect-column-indices.js` |
-| 程式化生成 icon PNG | `templates/generate-icons.py` |
+| 程式化生成 icon PNG | `scirpts/generate-icons.py` |
 | URL/domain pattern → RegExp（blocklist / allowlist 用） | `templates/pattern-to-regex.js` |
 
-### Key decisions embedded in templates (summary)
+#### Key decisions embedded in templates (summary)
 
 - **Panel toggle**: Use `visibility + opacity` class toggle, never `display: none ↔ block` (causes layout flicker after drag positioning).
 - **sendMessage**: Always use `safeSendMessage` — bare `chrome.tabs.sendMessage` throws when content script isn't injected yet.
@@ -109,13 +103,11 @@ All reusable code patterns are in `templates/`. **Load only what you need** by c
 - **Column indices**: Always resolve dynamically with fallback values; never hardcode.
 - **Icons**: If no assets provided, run `generate-icons.py` to produce valid placeholder PNGs.
 
----
-
-## Phase 5 — Packaging
+### Phase 5 — Packaging
 
 Package as a zip for the user to load unpacked:
 
-1. Copy `references/installation-guide.md` to the extension-folder, and rename it as README.md
+1. Copy `templates/installation-guide.md` to the extension-folder, and rename it as README.md
 2. Run script below
 ```bash
 cd /path/to/extension-folder
