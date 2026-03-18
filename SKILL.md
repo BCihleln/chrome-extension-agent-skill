@@ -60,6 +60,7 @@ For any page:
 ```
 extension-name/
 ├── manifest.json        # Extension config and permissions
+├── utils.js             # Shared utility functions (Optional, add when 2+ modules share logic)
 ├── content.js           # Injected into target pages
 ├── content.css          # Page-level styles (required)
 ├── popup.html           # Toolbar popup UI (Optional, Needed if popup required)
@@ -72,6 +73,17 @@ extension-name/
 ```
 
 Only include `background.js` if the extension needs persistent state across tabs or alarm-based scheduling. Most content-scanning extensions don't need it.
+
+### Shared utilities — utils.js
+
+**content.js and popup.js run in completely separate JS environments** — popup cannot call functions defined in content.js, and vice versa. If any function is needed by 2 or more modules, extract it into `utils.js`.
+
+**Before implementing any helper function**, check `templates/` for an existing one (e.g. `pattern-to-regex.js`).
+
+When adding `utils.js`:
+- In `manifest.json`, list it **before** the main script: `"js": ["utils.js", "content.js"]`
+- In `popup.html`, load it **before** popup.js: `<script src="utils.js"></script>`
+- Expose shared functions on a named namespace object (e.g. `const MyExtUtils = { fn1, fn2 }`) to avoid global collisions
 
 ---
 
@@ -87,6 +99,7 @@ All reusable code patterns are in `templates/`. **Load only what you need** by c
 | 圖片失效偵測 | `templates/check-image-broken.js` |
 | 多層表頭欄位索引解析 | `templates/detect-column-indices.js` |
 | 程式化生成 icon PNG | `templates/generate-icons.py` |
+| URL/domain pattern → RegExp（blocklist / allowlist 用） | `templates/pattern-to-regex.js` |
 
 ### Key decisions embedded in templates (summary)
 
@@ -111,6 +124,20 @@ zip -r extension-name.zip . --exclude "*.DS_Store" --exclude "__MACOSX/*"
 3. Copy to `/mnt/user-data/outputs/` and call `present_files`.
 
 ---
+
+## Small additions to existing extensions
+
+For feature additions or bug fixes on an **existing** extension that are **≤ 50 lines and touch ≤ 4 files**, apply these defaults unless the user explicitly asks for file output:
+
+**Principle**: Minimise unintended AI-introduced changes and keep diffs easy to review — prefer instructing the user over autonomously rewriting files.
+
+**Default behaviour — text-only guidance:**
+1. State which file(s) to edit and exactly where (function name / line context)
+2. Provide the replacement snippet
+3. Explain *why* the change is needed (so the user can verify intent)
+4. Do **not** output the full modified file unless asked
+
+**Override**: If the user says "just do it", "update the file", "output the zip", etc., switch to full file output as normal.
 
 ## Common Pitfalls Checklist
 
