@@ -33,6 +33,7 @@ How should results be shown? Common options:
 
 5. **Architecture preference** (single_select)
 - Separate CSS file vs inline styles in JS?
+- Does this extension have (or plan to have) **multiple independent sub-features**? If yes, use the sub-feature folder structure (each feature in its own folder with `main.js`, `config.json`, `{panel}.html`, `styles.css`).
 
 You must collect all answers via `ask_user_input` tool before moving to Phase 2. **Do not to make assumptions.**
 
@@ -57,18 +58,53 @@ For any page:
 extension-name/
 ├── manifest.json        # Extension config and permissions
 ├── utils.js             # Shared utility functions (Optional, add when 2+ modules share logic)
-├── content.js           # Injected into target pages
-├── content.css          # Page-level styles (required)
-├── popup.html           # Toolbar popup UI (Optional, Needed if popup required)
-├── popup.js             # Popup logic (Optional, Needed if popup required)
-├── background.js        # Service worker (Optional, Needed if user required)
-└── icons/
-    ├── icon16.png
-    ├── icon48.png
-    └── icon128.png
+├── popup.html           # Toolbar popup UI (Optional, needed if popup required)
+├── popup.js             # Popup logic (Optional, needed if popup required)
+├── popup.css            # Popup styles (Optional, needed if popup required)
+├── background.js        # Service worker (Optional, needed if persistent state required)
+├── icons/
+│   ├── icon16.png
+│   ├── icon48.png
+│   └── icon128.png
+└── {feature-name}/      # One folder per sub-feature (see below)
+    ├── main.js
+    ├── config.json
+    ├── {panel}.html
+    └── styles.css
 ```
 
 Only include `background.js` if the extension needs persistent state across tabs or alarm-based scheduling. Most content-scanning extensions don't need it.
+
+#### Sub-feature folder structure
+
+Each self-contained sub-feature (e.g. a floating panel, an auto-filler, a checker) lives in its **own folder**. Sub-features are low-coupling modules — they can be added or removed without touching other features.
+
+Inside each sub-feature folder, the **four standard files** are:
+
+| File | Purpose | Rules |
+|---|---|---|
+| `main.js` | Feature logic + event wiring | **No large HTML/CSS blocks**. Load HTML via `fetch(chrome.runtime.getURL(...))` |
+| `config.json` | Tunable constants (timeouts, IDs, URLs, flags) | Named `config.json`, not `{feature}-config.json`. Easy to scan for maintainers |
+| `{panel}.html` | UI structure only — named by role: `panel.html`, `button.html`, etc. | **No `<style>` tags**. CSS lives in `styles.css` |
+| `styles.css` | All UI styles for this feature | Referenced from `.html` via `<link>` |
+
+**Loading sub-feature HTML from main.js:**
+```js
+// ✅ Correct — load HTML template from file, never build large DOM via innerHTML strings
+const url = chrome.runtime.getURL('feature-name/panel.html');
+const html = await fetch(url).then(r => r.text());
+container.innerHTML = html; // single injection point
+```
+
+**Registering sub-feature assets in manifest.json:**
+```json
+"web_accessible_resources": [{
+  "resources": ["feature-name/panel.html", "feature-name/config.json"],
+  "matches": ["<all_urls>"]
+}]
+```
+
+**Dynamic content inside panel** (counts, error lists, etc.) is fine as JS-generated DOM — just keep the *structural skeleton* in `.html` and *data-driven fragments* in JS. As a rule of thumb: if a block is static scaffolding that never changes at runtime, it belongs in `.html`; if it's data-driven, build it in JS.
 
 #### Shared utilities — utils.js
 
@@ -143,3 +179,10 @@ Before delivering, verify:
 - [ ] `run_at: document_idle` set so DOM is ready when script runs
 - [ ] Icons exist (even as programmatically generated placeholders)
 - [ ] `cache: 'no-store'` on fetch calls to avoid stale 200 responses for broken images
+
+**Sub-feature structure (if using sub-folders):**
+- [ ] Each sub-feature folder contains: `main.js`, `config.json`, `{panel}.html`, `styles.css`
+- [ ] `main.js` loads panel HTML via `fetch(chrome.runtime.getURL(...))` — no large inline HTML/CSS strings
+- [ ] Config file is named `config.json` (not `{feature}-config.json`)
+- [ ] `{panel}.html` has no `<style>` tags — all styles in `styles.css`
+- [ ] Sub-feature HTML files are listed in `manifest.json` → `web_accessible_resources`
