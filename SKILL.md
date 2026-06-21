@@ -171,14 +171,11 @@ For feature additions or bug fixes on an **existing** extension that are **≤ 5
 
 Before delivering, verify:
 
-- [ ] `img.getAttribute('src')` used (not `img.src`) for broken image detection
 - [ ] Panel visibility uses class toggle (not `display: none`)
 - [ ] `safeSendMessage` used in popup (not bare `chrome.tabs.sendMessage`)
-- [ ] Table column indices resolved dynamically with fallbacks
 - [ ] `host_permissions` in manifest covers the target domain
 - [ ] `run_at: document_idle` set so DOM is ready when script runs
 - [ ] Icons exist (even as programmatically generated placeholders)
-- [ ] `cache: 'no-store'` on fetch calls to avoid stale 200 responses for broken images
 
 **Sub-feature structure (if using sub-folders):**
 - [ ] Each sub-feature folder contains: `main.js`, `config.json`, `{panel}.html`, `styles.css`
