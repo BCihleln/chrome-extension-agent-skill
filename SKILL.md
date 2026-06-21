@@ -33,7 +33,7 @@ How should results be shown? Common options:
 
 5. **Architecture preference** (single_select)
 - Separate CSS file vs inline styles in JS?
-- Does this extension have (or plan to have) **multiple independent sub-features**? If yes, use the sub-feature folder structure (each feature in its own folder with `main.js`, `config.json`, `{panel}.html`, `styles.css`).
+- Does this extension have (or plan to have) **multiple independent sub-features**? If yes, use the sub-feature folder structure (each feature in its own folder with `main.js`, `{panel}.html`, `styles.css`).
 
 You must collect all answers via `ask_user_input` tool before moving to Phase 2. **Do not to make assumptions.**
 
@@ -57,6 +57,7 @@ For any page:
 ```
 extension-name/
 ├── manifest.json        # Extension config and permissions
+├── module-manager.js    # Manages dynamic lifecycle of sub-modules
 ├── utils.js             # Shared utility functions (Optional, add when 2+ modules share logic)
 ├── popup.html           # Toolbar popup UI (Optional, needed if popup required)
 ├── popup.js             # Popup logic (Optional, needed if popup required)
@@ -67,24 +68,26 @@ extension-name/
 │   ├── icon48.png
 │   └── icon128.png
 └── {feature-name}/      # One folder per sub-feature (see below)
+    ├── index.js         # Sub-module entry point: { id, onEnable, onDisable }
     ├── main.js
-    ├── config.json
     ├── {panel}.html
     └── styles.css
 ```
 
 Only include `background.js` if the extension needs persistent state across tabs or alarm-based scheduling. Most content-scanning extensions don't need it.
 
-#### Sub-feature folder structure
+#### Pluggable Sub-module Architecture
+
+The extension uses a pluggable sub-module architecture. Central to this is `module-manager.js` which handles the dynamic lifecycle (enabling/disabling) of modules.
 
 Each self-contained sub-feature (e.g. a floating panel, an auto-filler, a checker) lives in its **own folder**. Sub-features are low-coupling modules — they can be added or removed without touching other features.
 
-Inside each sub-feature folder, the **four standard files** are:
+Inside each sub-feature folder, the key files are:
 
 | File | Purpose | Rules |
 |---|---|---|
+| `index.js` | Module entry point | Exports `{ id, onEnable, onDisable }`. Registered in `module-manager.js`. |
 | `main.js` | Feature logic + event wiring | **No large HTML/CSS blocks**. Load HTML via `fetch(chrome.runtime.getURL(...))` |
-| `config.json` | Tunable constants (timeouts, IDs, URLs, flags) | Named `config.json`, not `{feature}-config.json`. Easy to scan for maintainers |
 | `{panel}.html` | UI structure only — named by role: `panel.html`, `button.html`, etc. | **No `<style>` tags**. CSS lives in `styles.css` |
 | `styles.css` | All UI styles for this feature | Referenced from `.html` via `<link>` |
 
@@ -99,7 +102,7 @@ container.innerHTML = html; // single injection point
 **Registering sub-feature assets in manifest.json:**
 ```json
 "web_accessible_resources": [{
-  "resources": ["feature-name/panel.html", "feature-name/config.json"],
+  "resources": ["feature-name/panel.html"],
   "matches": ["<all_urls>"]
 }]
 ```
@@ -121,22 +124,22 @@ When adding `utils.js`:
 
 All reusable code patterns are in `templates/`. **Load only what you need** by copying the relevant file into the implementation. **Do not load all templates at once.**
 
+You should directly copy these templates from the `templates/` directory to expand functionality efficiently.
+
 | Required Function | Templates Path |
 |---|---|
-| `manifest.json` 初始結構 | `templates/manifest.json` |
-| Panel 顯示/隱藏（無 flicker） | `templates/panel-toggle.css` + `templates/panel-toggle.js` |
-| Popup → content script 通訊 | `templates/safe-send-message.js` |
-| 圖片失效偵測 | `templates/check-image-broken.js` |
-| 多層表頭欄位索引解析 | `templates/detect-column-indices.js` |
+| `manifest.json` | `templates/manifest.json` |
+| Pluggable Module Manager | `templates/module-manager.js` |
+| Sub-module Entry Point | `templates/submodule-index.js` |
+| Panel | `templates/panel-toggle.css` + `templates/panel-toggle.js` |
+| Popup → content script | `templates/safe-send-message.js` |
 | 程式化生成 icon PNG | `scirpts/generate-icons.py` |
-| URL/domain pattern → RegExp（blocklist / allowlist 用） | `templates/pattern-to-regex.js` |
 
 #### Key decisions embedded in templates (summary)
 
+- **Module lifecycle**: `module-manager.js` handles enabling/disabling of modules dynamically.
 - **Panel toggle**: Use `visibility + opacity` class toggle, never `display: none ↔ block` (causes layout flicker after drag positioning).
 - **sendMessage**: Always use `safeSendMessage` — bare `chrome.tabs.sendMessage` throws when content script isn't injected yet.
-- **Image broken check**: Use `getAttribute('src')` not `img.src`; verify `Content-Type` not just HTTP status.
-- **Column indices**: Always resolve dynamically with fallback values; never hardcode.
 - **Icons**: If no assets provided, run `generate-icons.py` to produce valid placeholder PNGs.
 
 ### Phase 5 — Packaging
@@ -178,8 +181,8 @@ Before delivering, verify:
 - [ ] Icons exist (even as programmatically generated placeholders)
 
 **Sub-feature structure (if using sub-folders):**
-- [ ] Each sub-feature folder contains: `main.js`, `config.json`, `{panel}.html`, `styles.css`
+- [ ] Each sub-feature folder contains: `index.js`, `main.js`, `{panel}.html`, `styles.css`
+- [ ] `index.js` exports `{ id, onEnable, onDisable }`
 - [ ] `main.js` loads panel HTML via `fetch(chrome.runtime.getURL(...))` — no large inline HTML/CSS strings
-- [ ] Config file is named `config.json` (not `{feature}-config.json`)
 - [ ] `{panel}.html` has no `<style>` tags — all styles in `styles.css`
 - [ ] Sub-feature HTML files are listed in `manifest.json` → `web_accessible_resources`
